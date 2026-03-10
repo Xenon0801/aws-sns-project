@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWS Project Architecture Diagrams</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --border: #1e2d45;
+    --accent1: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --accent4: #f59e0b;
+    --accent5: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --glow1: rgba(0,212,255,0.15);
+    --glow2: rgba(124,58,237,0.15);
+    --glow3: rgba(16,185,129,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page-wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 24px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 64px;
+  }
+
+  header .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--accent1);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards;
+  }
+
+  header h1 {
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 800;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #fff 0%, var(--accent1) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.1s forwards;
+  }
+
+  header p {
+    color: var(--muted);
+    margin-top: 12px;
+    font-size: 15px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.2s forwards;
+  }
+
+  /* Project cards */
+  .project {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin-bottom: 48px;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(30px);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .project.visible {
+    animation: slideUp 0.7s ease forwards;
+  }
+
+  .project:hover {
+    box-shadow: 0 0 60px var(--project-glow, var(--glow1));
+    border-color: var(--project-color, var(--accent1));
+  }
+
+  .project-1 { --project-color: var(--accent1); --project-glow: var(--glow1); }
+  .project-2 { --project-color: var(--accent2); --project-glow: var(--glow2); }
+  .project-3 { --project-color: var(--accent3); --project-glow: var(--glow3); }
+
+  .project-header {
+    padding: 24px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.02), transparent);
+  }
+
+  .project-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: var(--project-color, var(--accent1));
+    color: #000;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  .project-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .project-goal {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  /* Diagram area */
+  .diagram {
+    padding: 36px 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Flow row */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+    position: relative;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    justify-content: center;
+    flex-wrap: nowrap;
+    margin-bottom: 8px;
+  }
+
+  /* Nodes */
+  .node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.03);
+    min-width: 90px;
+    max-width: 110px;
+    text-align: center;
+    transition: all 0.25s ease;
+    cursor: default;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .node:hover {
+    transform: translateY(-3px);
+    border-color: var(--node-color, var(--accent1));
+    background: rgba(255,255,255,0.06);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3), 0 0 20px var(--node-glow, rgba(0,212,255,0.2));
+  }
+
+  .node .icon {
+    font-size: 24px;
+    line-height: 1;
+  }
+
+  .node .name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--node-color, #fff);
+    letter-spacing: 0.5px;
+    line-height: 1.3;
+  }
+
+  .node .desc {
+    font-size: 9px;
+    color: var(--muted);
+    line-height: 1.3;
+  }
+
+  /* Arrows */
+  .arrow {
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    flex-shrink: 0;
+  }
+
+  .arrow svg {
+    opacity: 0.4;
+    transition: opacity 0.2s;
+  }
+
+  .flow:hover .arrow svg { opacity: 0.7; }
+
+  .arrow-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 0 4px;
+    flex-shrink: 0;
+  }
+
+  .arrow-label .alabel {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* Vertical arrow */
+  .varrow {
+    display: flex;
+    justify-content: center;
+    padding: 4px 0;
+  }
+
+  /* Groups / Zones */
+  .zone {
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    position: relative;
+    margin: 8px 4px;
+  }
+
+  .zone-label {
+    position: absolute;
+    top: -9px;
+    left: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 0 8px;
+    background: var(--surface);
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .zone-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* Two AZ layout */
+  .az-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 12px 0;
+  }
+
+  .az-box {
+    border: 1px dashed rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .az-box .az-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* Step badges */
+  .steps {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .step-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--project-color, var(--accent1));
+  }
+
+  /* Specific node colors */
+  .n-user    { --node-color: #94a3b8; --node-glow: rgba(148,163,184,0.2); }
+  .n-igw     { --node-color: var(--accent4); --node-glow: rgba(245,158,11,0.2); }
+  .n-alb     { --node-color: var(--accent1); --node-glow: rgba(0,212,255,0.2); }
+  .n-ec2     { --node-color: #ff9500; --node-glow: rgba(255,149,0,0.2); }
+  .n-asg     { --node-color: var(--accent1); --node-glow: rgba(0,212,255,0.2); }
+  .n-vpc     { --node-color: #8b5cf6; --node-glow: rgba(139,92,246,0.2); }
+  .n-apigw   { --node-color: var(--accent2); --node-glow: rgba(124,58,237,0.2); }
+  .n-lambda  { --node-color: var(--accent4); --node-glow: rgba(245,158,11,0.2); }
+  .n-dynamo  { --node-color: var(--accent3); --node-glow: rgba(16,185,129,0.2); }
+  .n-iam     { --node-color: #ec4899; --node-glow: rgba(236,72,153,0.2); }
+  .n-cw      { --node-color: var(--accent1); --node-glow: rgba(0,212,255,0.2); }
+  .n-sns     { --node-color: var(--accent5); --node-glow: rgba(239,68,68,0.2); }
+  .n-email   { --node-color: var(--accent3); --node-glow: rgba(16,185,129,0.2); }
+  .n-cwagent { --node-color: var(--accent4); --node-glow: rgba(245,158,11,0.2); }
+  .n-logs    { --node-color: #94a3b8; --node-glow: rgba(148,163,184,0.2); }
+
+  /* Tooltip */
+  .node[data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 10;
+    pointer-events: none;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+
+  @keyframes fadeUp {
+    to { opacity: 1; transform: none; }
+  }
+
+  @keyframes slideUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Animated flow line */
+  .flow-line {
+    width: 36px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--line-color, var(--accent1)), transparent);
+    background-size: 200% 100%;
+    animation: flowAnim 2s linear infinite;
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  .flow-line::after {
+    content: '▶';
+    position: absolute;
+    right: -2px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 8px;
+    color: var(--line-color, var(--accent1));
+  }
+
+  @keyframes flowAnim {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .flow-line.purple { --line-color: var(--accent2); }
+  .flow-line.green  { --line-color: var(--accent3); }
+  .flow-line.amber  { --line-color: var(--accent4); }
+  .flow-line.red    { --line-color: var(--accent5); }
+
+  .vflow-line {
+    width: 2px;
+    height: 28px;
+    background: linear-gradient(180deg, transparent, var(--line-color, var(--accent1)), transparent);
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .vflow-line::after {
+    content: '▼';
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 8px;
+    color: var(--line-color, var(--accent1));
+  }
+
+  .vflow-line.purple { --line-color: var(--accent2); }
+  .vflow-line.amber  { --line-color: var(--accent4); }
+  .vflow-line.green  { --line-color: var(--accent3); }
+  .vflow-line.red    { --line-color: var(--accent5); }
+
+  /* Center alignment helpers */
+  .center { text-align: center; }
+  .flex-center { display: flex; justify-content: center; }
+  .full-flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .horiz {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    justify-content: center;
+    flex-wrap: nowrap;
+  }
+
+  @media (max-width: 600px) {
+    .horiz { flex-wrap: wrap; gap: 8px; }
+    .flow-line { width: 20px; }
+    .az-grid { grid-template-columns: 1fr; }
+    .project-goal { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <header>
+    <div class="label">// Infrastructure as Code</div>
+    <h1>AWS Architecture Diagrams</h1>
+    <p>Hover over any service to interact · Animated data flows show request paths</p>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════
+       PROJECT 1: HA Web Application
+  ═══════════════════════════════════════════════════ -->
+  <div class="project project-1" id="p1">
+    <div class="project-header">
+      <span class="project-num">Project 1</span>
+      <span class="project-title">Highly Available Web Application</span>
+      <span class="project-goal">EC2 + ALB + ASG</span>
+    </div>
+    <div class="diagram">
+
+      <!-- Full vertical flow -->
+      <div class="full-flow">
+
+        <!-- Row 1: User -->
+        <div class="horiz">
+          <div class="node n-user" data-tip="Browser / HTTP client">
+            <span class="icon">🌐</span>
+            <span class="name">Internet</span>
+            <span class="desc">User request</span>
+          </div>
+        </div>
+
+        <div class="vflow-line"></div>
+
+        <!-- Row 2: IGW -->
+        <div class="horiz">
+          <div class="node n-igw" data-tip="Routes traffic in/out of VPC">
+            <span class="icon">🚪</span>
+            <span class="name">IGW</span>
+            <span class="desc">Internet Gateway</span>
+          </div>
+        </div>
+
+        <div class="vflow-line"></div>
+
+        <!-- Row 3: ALB spanning both AZs -->
+        <div class="zone" style="width:100%;max-width:680px;">
+          <span class="zone-label">VPC — 10.0.0.0/16 · Public Subnets</span>
+          <div class="horiz" style="justify-content:center;gap:8px;">
+            <div class="node n-alb" data-tip="Distributes traffic across EC2 instances · Health checks every 30s">
+              <span class="icon">⚖️</span>
+              <span class="name">ALB</span>
+              <span class="desc">App Load Balancer</span>
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);padding:0 8px;text-align:center;">
+              10.0.1.0/24 → AZ-a<br>10.0.2.0/24 → AZ-b
+            </div>
+          </div>
+        </div>
+
+        <div class="vflow-line"></div>
+
+        <!-- Row 4: ASG with 2 AZs -->
+        <div class="zone" style="width:100%;max-width:680px;">
+          <span class="zone-label">Auto Scaling Group — min:2 / desired:2 / max:4</span>
+          <div class="az-grid" style="max-width:540px;margin:8px auto 0;">
+            <div class="az-box">
+              <div class="az-title">AZ — eu-west-2a</div>
+              <div class="node n-ec2" data-tip="t2.micro · Private subnet · Apache web server" style="margin:0 auto;">
+                <span class="icon">🖥️</span>
+                <span class="name">EC2</span>
+                <span class="desc">10.0.3.0/24</span>
+              </div>
+            </div>
+            <div class="az-box">
+              <div class="az-title">AZ — eu-west-2b</div>
+              <div class="node n-ec2" data-tip="t2.micro · Private subnet · Apache web server" style="margin:0 auto;">
+                <span class="icon">🖥️</span>
+                <span class="name">EC2</span>
+                <span class="desc">10.0.4.0/24</span>
+              </div>
+            </div>
+          </div>
+          <div style="text-align:center;margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);">
+            CPU &gt; 80% → Scale Up +1 instance · CPU &lt; 20% → Scale Down −1 instance
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Steps -->
+      <div class="steps">
+        <div class="step"><span class="step-num">1</span>User hits ALB DNS endpoint</div>
+        <div class="step"><span class="step-num">2</span>ALB health-checks both EC2s</div>
+        <div class="step"><span class="step-num">3</span>Traffic round-robins across AZs</div>
+        <div class="step"><span class="step-num">4</span>ASG scales on CPU alarm</div>
+        <div class="step"><span class="step-num">5</span>If AZ fails, other AZ absorbs traffic</div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent1)"></div>Public subnet (ALB)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff9500"></div>Private subnet (EC2)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--muted)"></div>Dashed = VPC boundary</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent3)"></div>HA = 2 AZs always active</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       PROJECT 2: Serverless REST API
+  ═══════════════════════════════════════════════════ -->
+  <div class="project project-2" id="p2">
+    <div class="project-header">
+      <span class="project-num">Project 2</span>
+      <span class="project-title">Serverless REST API</span>
+      <span class="project-goal">API Gateway + Lambda + DynamoDB</span>
+    </div>
+    <div class="diagram">
+
+      <div class="full-flow">
+
+        <!-- Client -->
+        <div class="horiz">
+          <div class="node n-user" data-tip="curl / Postman / any HTTP client">
+            <span class="icon">💻</span>
+            <span class="name">Client</span>
+            <span class="desc">HTTP Request</span>
+          </div>
+        </div>
+
+        <div class="vflow-line purple"></div>
+
+        <!-- API Gateway -->
+        <div class="horiz">
+          <div class="node n-apigw" data-tip="REST API · Routes GET/POST/PUT/DELETE to Lambda · Managed HTTPS endpoint">
+            <span class="icon">🔀</span>
+            <span class="name">API Gateway</span>
+            <span class="desc">REST API /users</span>
+          </div>
+        </div>
+
+        <div class="vflow-line amber"></div>
+
+        <!-- IAM + Lambda side by side -->
+        <div class="horiz" style="gap:12px;">
+          <div class="node n-iam" data-tip="Least-privilege IAM role attached to Lambda · Only allows DynamoDB read/write">
+            <span class="icon">🔐</span>
+            <span class="name">IAM Role</span>
+            <span class="desc">Lambda perms</span>
+          </div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--accent2);padding:0 4px;">→ grants →</div>
+          <div class="node n-lambda" data-tip="Python 3.12 · Handles all CRUD logic · Invoked by API Gateway · No server to manage">
+            <span class="icon">λ</span>
+            <span class="name">Lambda</span>
+            <span class="desc">Python CRUD</span>
+          </div>
+        </div>
+
+        <div class="vflow-line green"></div>
+
+        <!-- DynamoDB -->
+        <div class="horiz">
+          <div class="node n-dynamo" data-tip="On-demand capacity · Partition key: id (String) · Single-digit ms latency · Serverless">
+            <span class="icon">🗄️</span>
+            <span class="name">DynamoDB</span>
+            <span class="desc">users table</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- HTTP Methods grid -->
+      <div style="margin-top:24px;padding:16px;border:1px solid var(--border);border-radius:10px;background:rgba(124,58,237,0.05);">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent2);margin-bottom:10px;letter-spacing:1px;">CRUD OPERATIONS</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;">
+          <div style="padding:8px 12px;border-radius:6px;border:1px solid rgba(16,185,129,0.3);background:rgba(16,185,129,0.05);">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent3);font-weight:700;">POST /users</span>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px;">Create new user</div>
+          </div>
+          <div style="padding:8px 12px;border-radius:6px;border:1px solid rgba(0,212,255,0.3);background:rgba(0,212,255,0.05);">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent1);font-weight:700;">GET /users</span>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px;">List all users</div>
+          </div>
+          <div style="padding:8px 12px;border-radius:6px;border:1px solid rgba(0,212,255,0.3);background:rgba(0,212,255,0.05);">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent1);font-weight:700;">GET /users/{id}</span>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px;">Get single user</div>
+          </div>
+          <div style="padding:8px 12px;border-radius:6px;border:1px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.05);">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent4);font-weight:700;">PUT /users/{id}</span>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px;">Update user</div>
+          </div>
+          <div style="padding:8px 12px;border-radius:6px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.05);">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent5);font-weight:700;">DELETE /users/{id}</span>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px;">Delete user</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="steps">
+        <div class="step"><span class="step-num">1</span>Client sends HTTP request to API GW URL</div>
+        <div class="step"><span class="step-num">2</span>API GW routes to Lambda (AWS_PROXY integration)</div>
+        <div class="step"><span class="step-num">3</span>Lambda assumes IAM role, runs Python handler</div>
+        <div class="step"><span class="step-num">4</span>Lambda reads/writes DynamoDB</div>
+        <div class="step"><span class="step-num">5</span>Response bubbles back as JSON</div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent2)"></div>No servers to manage</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent4)"></div>Lambda: pay per invocation</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent3)"></div>DynamoDB: on-demand capacity</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ec4899"></div>IAM: least privilege enforced</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       PROJECT 3: Monitoring & Alerting
+  ═══════════════════════════════════════════════════ -->
+  <div class="project project-3" id="p3">
+    <div class="project-header">
+      <span class="project-num">Project 3</span>
+      <span class="project-title">Centralized Monitoring &amp; Alerting</span>
+      <span class="project-goal">CloudWatch + SNS</span>
+    </div>
+    <div class="diagram">
+
+      <div class="full-flow">
+
+        <!-- EC2 + Agent -->
+        <div class="zone" style="max-width:520px;width:100%;">
+          <span class="zone-label">EC2 Instance (t2.micro)</span>
+          <div class="horiz" style="gap:12px;">
+            <div class="node n-ec2" data-tip="The server being monitored · Runs web server or any workload">
+              <span class="icon">🖥️</span>
+              <span class="name">EC2</span>
+              <span class="desc">Monitored server</span>
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--accent4);padding:0 4px;">runs</div>
+            <div class="node n-cwagent" data-tip="Installed via user_data on boot · Collects memory, disk, CPU metrics every 60s and ships to CloudWatch">
+              <span class="icon">📡</span>
+              <span class="name">CW Agent</span>
+              <span class="desc">Metrics every 60s</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metrics flowing up -->
+        <div style="display:flex;justify-content:center;gap:40px;padding:4px 0;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+            <div class="vflow-line" style="height:20px;"></div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted);">CPU/Status</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+            <div class="vflow-line amber" style="height:20px;"></div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted);">Mem/Disk</span>
+          </div>
+        </div>
+
+        <!-- CloudWatch -->
+        <div class="horiz">
+          <div class="node n-cw" data-tip="Collects all metrics · Evaluates alarm thresholds · Hosts Dashboard · Stores logs for 7 days">
+            <span class="icon">📊</span>
+            <span class="name">CloudWatch</span>
+            <span class="desc">Metrics + Alarms</span>
+          </div>
+        </div>
+
+        <!-- Alarms grid -->
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0;max-width:480px;width:100%;">
+          <div style="padding:10px 12px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.05);text-align:center;">
+            <div style="font-size:16px;">🔴</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent5);margin-top:4px;font-weight:700;">CPU &gt; 80%</div>
+            <div style="font-size:9px;color:var(--muted);">for 4 minutes</div>
+          </div>
+          <div style="padding:10px 12px;border-radius:8px;border:1px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.05);text-align:center;">
+            <div style="font-size:16px;">🟡</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent4);margin-top:4px;font-weight:700;">Memory &gt; 85%</div>
+            <div style="font-size:9px;color:var(--muted);">CW Agent metric</div>
+          </div>
+          <div style="padding:10px 12px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.05);text-align:center;">
+            <div style="font-size:16px;">🚨</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent5);margin-top:4px;font-weight:700;">Status Check Fail</div>
+            <div style="font-size:9px;color:var(--muted);">instance health</div>
+          </div>
+          <div style="padding:10px 12px;border-radius:8px;border:1px solid rgba(148,163,184,0.3);background:rgba(148,163,184,0.05);text-align:center;">
+            <div style="font-size:16px;">💾</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#94a3b8;margin-top:4px;font-weight:700;">Disk &gt; 90%</div>
+            <div style="font-size:9px;color:var(--muted);">CW Agent metric</div>
+          </div>
+        </div>
+
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--accent5);letter-spacing:1px;">ALARM TRIGGERED ↓</div>
+
+        <div class="vflow-line red" style="height:20px;"></div>
+
+        <!-- SNS -->
+        <div class="horiz">
+          <div class="node n-sns" data-tip="Pub/Sub service · Receives alarm from CloudWatch · Fans out to subscribers">
+            <span class="icon">📢</span>
+            <span class="name">SNS Topic</span>
+            <span class="desc">cloudwatch-alerts</span>
+          </div>
+        </div>
+
+        <div class="vflow-line green"></div>
+
+        <!-- Email -->
+        <div class="horiz">
+          <div class="node n-email" data-tip="Email subscription · Must confirm via link in first email · Receives alarm details instantly">
+            <span class="icon">📧</span>
+            <span class="name">Email Alert</span>
+            <span class="desc">your@email.com</span>
+          </div>
+        </div>
+
+        <!-- Also: logs -->
+        <div style="margin-top:16px;padding:14px 16px;border:1px solid var(--border);border-radius:8px;max-width:480px;width:100%;background:rgba(255,255,255,0.02);">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);margin-bottom:8px;letter-spacing:1px;">ALSO COLLECTED</div>
+          <div class="horiz" style="gap:16px;justify-content:center;">
+            <div class="node n-logs" data-tip="/var/log/messages shipped to CloudWatch Logs every 60s · Retained 7 days" style="max-width:140px;">
+              <span class="icon">📋</span>
+              <span class="name">CW Logs</span>
+              <span class="desc">/ec2/system-logs</span>
+            </div>
+            <div class="node n-cw" data-tip="Visual dashboard showing CPU, memory graphs and alarm status" style="max-width:140px;">
+              <span class="icon">📈</span>
+              <span class="name">Dashboard</span>
+              <span class="desc">CPU + Mem graphs</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="steps">
+        <div class="step"><span class="step-num">1</span>CW Agent installed on boot via user_data</div>
+        <div class="step"><span class="step-num">2</span>Metrics stream to CloudWatch every 60s</div>
+        <div class="step"><span class="step-num">3</span>Alarm threshold breached → triggers SNS</div>
+        <div class="step"><span class="step-num">4</span>SNS publishes to email subscription</div>
+        <div class="step"><span class="step-num">5</span>You get alert email within ~1 minute</div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent1)"></div>Native EC2 metrics (no agent)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent4)"></div>CW Agent metrics (mem, disk)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent5)"></div>Alarm → SNS → Email</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent3)"></div>Logs retained 7 days</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Intersection observer for scroll-triggered animations
+  const projects = document.querySelectorAll('.project');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry, i) => {
+      if (entry.isIntersecting) {
+        setTimeout(() => {
+          entry.target.classList.add('visible');
+        }, i * 100);
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1 });
+
+  projects.forEach(p => observer.observe(p));
+</script>
+</body>
+</html>
