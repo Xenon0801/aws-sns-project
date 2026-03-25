@@ -1,6 +1,6 @@
 # ============================================================
-# PROJECT 1: Highly Available Web Application
-# Services: EC2 + Application Load Balancer + Auto Scaling Group
+# PROJECT 3: Centralized Monitoring & Alerting
+# Services: CloudWatch + SNS
 # ============================================================
 
 terraform {
@@ -16,151 +16,33 @@ provider "aws" {
   region = var.aws_region
 }
 
-# ----------------------------
-# VARIABLES
-# ----------------------------
 variable "aws_region" {
-  default = "eu-west-2" # London - change if needed
+  default = "eu-west-2"
 }
 
-variable "key_pair_name" {
-  description = "Your EC2 key pair name"
+variable "alert_email" {
+  description = "Email address to receive CloudWatch alerts"
   type        = string
-  default     = "keypair-1" # Replace with your actual key pair name
+  default     = "hardikshrivastava8jan@gmail.com" # Replace with your email
 }
 
 # ----------------------------
-# VPC
+# SNS TOPIC + EMAIL SUBSCRIPTION
 # ----------------------------
-resource "aws_vpc" "ha_vpc" {
-  cidr_block           = "10.0.0.0/16"
-  enable_dns_hostnames = true
-  enable_dns_support   = true
-
-  tags = { Name = "ha-vpc" }
+resource "aws_sns_topic" "alerts" {
+  name = "cloudwatch-alerts"
+  tags = { Name = "cloudwatch-alerts" }
 }
 
-# ----------------------------
-# INTERNET GATEWAY
-# ----------------------------
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.ha_vpc.id
-  tags   = { Name = "ha-igw" }
+resource "aws_sns_topic_subscription" "email_alert" {
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "email"
+  endpoint  = var.alert_email
+  # NOTE: You must confirm the subscription via email after terraform apply
 }
 
 # ----------------------------
-# SUBNETS (2 AZs for HA)
-# ----------------------------
-resource "aws_subnet" "public_1" {
-  vpc_id                  = aws_vpc.ha_vpc.id
-  cidr_block              = "10.0.1.0/24"
-  availability_zone       = "${var.aws_region}a"
-  map_public_ip_on_launch = true
-  tags                    = { Name = "public-subnet-1" }
-}
-
-resource "aws_subnet" "public_2" {
-  vpc_id                  = aws_vpc.ha_vpc.id
-  cidr_block              = "10.0.2.0/24"
-  availability_zone       = "${var.aws_region}b"
-  map_public_ip_on_launch = true
-  tags                    = { Name = "public-subnet-2" }
-}
-
-resource "aws_subnet" "private_1" {
-  vpc_id            = aws_vpc.ha_vpc.id
-  cidr_block        = "10.0.3.0/24"
-  availability_zone = "${var.aws_region}a"
-  tags              = { Name = "private-subnet-1" }
-}
-
-resource "aws_subnet" "private_2" {
-  vpc_id            = aws_vpc.ha_vpc.id
-  cidr_block        = "10.0.4.0/24"
-  availability_zone = "${var.aws_region}b"
-  tags              = { Name = "private-subnet-2" }
-}
-
-# ----------------------------
-# ROUTE TABLE (Public)
-# ----------------------------
-resource "aws_route_table" "public_rt" {
-  vpc_id = aws_vpc.ha_vpc.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
-  }
-
-  tags = { Name = "public-rt" }
-}
-
-resource "aws_route_table_association" "public_1" {
-  subnet_id      = aws_subnet.public_1.id
-  route_table_id = aws_route_table.public_rt.id
-}
-
-resource "aws_route_table_association" "public_2" {
-  subnet_id      = aws_subnet.public_2.id
-  route_table_id = aws_route_table.public_rt.id
-}
-
-# ----------------------------
-# SECURITY GROUPS
-# ----------------------------
-resource "aws_security_group" "alb_sg" {
-  name        = "alb-sg"
-  description = "Allow HTTP from internet"
-  vpc_id      = aws_vpc.ha_vpc.id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = { Name = "alb-sg" }
-}
-
-resource "aws_security_group" "ec2_sg" {
-  name        = "ec2-sg"
-  description = "Allow HTTP from ALB only"
-  vpc_id      = aws_vpc.ha_vpc.id
-
-  ingress {
-    from_port       = 80
-    to_port         = 80
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
-  }
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Restrict to your IP in production
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = { Name = "ec2-sg" }
-}
-
-# ----------------------------
-# LAUNCH TEMPLATE
+# EC2 INSTANCE (to monitor)
 # ----------------------------
 data "aws_ami" "amazon_linux" {
   most_recent = true
@@ -172,116 +54,275 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-resource "aws_launch_template" "web_lt" {
-  name_prefix   = "ha-web-"
-  image_id      = data.aws_ami.amazon_linux.id
-  instance_type = "t2.micro"
-  key_name      = var.key_pair_name
+resource "aws_security_group" "monitoring_sg" {
+  name        = "monitoring-sg"
+  description = "Allow SSH"
 
-  network_interfaces {
-    associate_public_ip_address = true
-    security_groups             = [aws_security_group.ec2_sg.id]
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
-  user_data = base64encode(<<-EOF
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_instance" "monitored_ec2" {
+  ami                    = data.aws_ami.amazon_linux.id
+  instance_type          = "t2.micro"
+  vpc_security_group_ids = [aws_security_group.monitoring_sg.id]
+
+  # Install CloudWatch agent via user data
+  user_data = <<-EOF
     #!/bin/bash
     yum update -y
-    yum install -y httpd
-    systemctl start httpd
-    systemctl enable httpd
-    echo "<h1>Hello from $(hostname -f) - Project 1: HA Web App</h1>" > /var/www/html/index.html
+    yum install -y amazon-cloudwatch-agent
+
+    # Create CloudWatch agent config
+    cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 'CONFIG'
+    {
+      "metrics": {
+        "append_dimensions": {
+          "InstanceId": "$${aws:InstanceId}"
+        },
+        "metrics_collected": {
+          "mem": {
+            "measurement": ["mem_used_percent"],
+            "metrics_collection_interval": 60
+          },
+          "disk": {
+            "measurement": ["disk_used_percent"],
+            "resources": ["/"],
+            "metrics_collection_interval": 60
+          },
+          "cpu": {
+            "measurement": ["cpu_usage_idle", "cpu_usage_user"],
+            "metrics_collection_interval": 60,
+            "totalcpu": true
+          }
+        }
+      },
+      "logs": {
+        "logs_collected": {
+          "files": {
+            "collect_list": [
+              {
+                "file_path": "/var/log/messages",
+                "log_group_name": "/ec2/system-logs",
+                "log_stream_name": "{instance_id}"
+              }
+            ]
+          }
+        }
+      }
+    }
+    CONFIG
+
+    # Start the agent
+    /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+      -a fetch-config \
+      -m ec2 \
+      -s \
+      -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
   EOF
-  )
 
-  tags = { Name = "ha-web-lt" }
+  iam_instance_profile = aws_iam_instance_profile.ec2_monitoring_profile.name
+
+  tags = { Name = "monitored-ec2" }
 }
 
 # ----------------------------
-# APPLICATION LOAD BALANCER
+# IAM FOR EC2 (CloudWatch permissions)
 # ----------------------------
-resource "aws_lb" "web_alb" {
-  name               = "ha-web-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = [aws_subnet.public_1.id, aws_subnet.public_2.id]
+resource "aws_iam_role" "ec2_monitoring_role" {
+  name = "ec2-cloudwatch-role"
 
-  tags = { Name = "ha-web-alb" }
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+    }]
+  })
 }
 
-resource "aws_lb_target_group" "web_tg" {
-  name     = "ha-web-tg"
-  port     = 80
-  protocol = "HTTP"
-  vpc_id   = aws_vpc.ha_vpc.id
-
-  health_check {
-    path                = "/"
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-    interval            = 30
-  }
-
-  tags = { Name = "ha-web-tg" }
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent_policy" {
+  role       = aws_iam_role.ec2_monitoring_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
 
-resource "aws_lb_listener" "web_listener" {
-  load_balancer_arn = aws_lb.web_alb.arn
-  port              = 80
-  protocol          = "HTTP"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.web_tg.arn
-  }
+resource "aws_iam_instance_profile" "ec2_monitoring_profile" {
+  name = "ec2-monitoring-profile"
+  role = aws_iam_role.ec2_monitoring_role.name
 }
 
 # ----------------------------
-# AUTO SCALING GROUP
+# CLOUDWATCH ALARMS
 # ----------------------------
-resource "aws_autoscaling_group" "web_asg" {
-  name                = "ha-web-asg"
-  desired_capacity    = 2
-  min_size            = 2
-  max_size            = 4
-  vpc_zone_identifier = [aws_subnet.public_1.id, aws_subnet.public_2.id]
-  target_group_arns   = [aws_lb_target_group.web_tg.arn]
-  health_check_type   = "ELB"
 
-  launch_template {
-    id      = aws_launch_template.web_lt.id
-    version = "$Latest"
+# Alarm 1: High CPU Usage
+resource "aws_cloudwatch_metric_alarm" "high_cpu" {
+  alarm_name          = "high-cpu-usage"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = 120
+  statistic           = "Average"
+  threshold           = 80
+  alarm_description   = "CPU usage exceeded 80% for 4 minutes"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  ok_actions          = [aws_sns_topic.alerts.arn]
+
+  dimensions = {
+    InstanceId = aws_instance.monitored_ec2.id
   }
 
-  tag {
-    key                 = "Name"
-    value               = "ha-web-instance"
-    propagate_at_launch = true
+  tags = { Name = "high-cpu-alarm" }
+}
+
+# Alarm 2: High Memory Usage (requires CloudWatch agent)
+resource "aws_cloudwatch_metric_alarm" "high_memory" {
+  alarm_name          = "high-memory-usage"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "mem_used_percent"
+  namespace           = "CWAgent"
+  period              = 120
+  statistic           = "Average"
+  threshold           = 85
+  alarm_description   = "Memory usage exceeded 85%"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+
+  dimensions = {
+    InstanceId = aws_instance.monitored_ec2.id
   }
+
+  tags = { Name = "high-memory-alarm" }
 }
 
-# Scale up policy
-resource "aws_autoscaling_policy" "scale_up" {
-  name                   = "scale-up"
-  autoscaling_group_name = aws_autoscaling_group.web_asg.name
-  adjustment_type        = "ChangeInCapacity"
-  scaling_adjustment     = 1
-  cooldown               = 300
+# Alarm 3: Instance Status Check Failed
+resource "aws_cloudwatch_metric_alarm" "instance_status" {
+  alarm_name          = "instance-status-check-failed"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "StatusCheckFailed"
+  namespace           = "AWS/EC2"
+  period              = 60
+  statistic           = "Maximum"
+  threshold           = 0
+  alarm_description   = "EC2 instance status check failed"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+
+  dimensions = {
+    InstanceId = aws_instance.monitored_ec2.id
+  }
+
+  tags = { Name = "instance-status-alarm" }
 }
 
-# Scale down policy
-resource "aws_autoscaling_policy" "scale_down" {
-  name                   = "scale-down"
-  autoscaling_group_name = aws_autoscaling_group.web_asg.name
-  adjustment_type        = "ChangeInCapacity"
-  scaling_adjustment     = -1
-  cooldown               = 300
+# Alarm 4: High Disk Usage (requires CloudWatch agent)
+resource "aws_cloudwatch_metric_alarm" "high_disk" {
+  alarm_name          = "high-disk-usage"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "disk_used_percent"
+  namespace           = "CWAgent"
+  period              = 300
+  statistic           = "Average"
+  threshold           = 90
+  alarm_description   = "Disk usage exceeded 90%"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+
+  dimensions = {
+    InstanceId = aws_instance.monitored_ec2.id
+    path       = "/"
+    fstype     = "xfs"
+  }
+
+  tags = { Name = "high-disk-alarm" }
+}
+
+# ----------------------------
+# CLOUDWATCH DASHBOARD
+# ----------------------------
+resource "aws_cloudwatch_dashboard" "main" {
+  dashboard_name = "EC2-Monitoring-Dashboard"
+
+  dashboard_body = jsonencode({
+    widgets = [
+      {
+        type = "metric"
+        properties = {
+          title  = "CPU Utilization"
+          period = 60
+          region = "eu-west-2"
+          stat   = "Average"
+          metrics = [
+            ["AWS/EC2", "CPUUtilization", "InstanceId", aws_instance.monitored_ec2.id]
+          ]
+        }
+      },
+      {
+        type = "metric"
+        properties = {
+          title  = "Memory Used %"
+          period = 60
+          region = "eu-west-2"
+          stat   = "Average"
+          metrics = [
+            ["CWAgent", "mem_used_percent", "InstanceId", aws_instance.monitored_ec2.id]
+          ]
+        }
+      },
+      {
+        type = "alarm"
+        properties = {
+          title = "Active Alarms"
+          region = "eu-west-2"
+          alarms = [
+            aws_cloudwatch_metric_alarm.high_cpu.arn,
+            aws_cloudwatch_metric_alarm.high_memory.arn,
+            aws_cloudwatch_metric_alarm.instance_status.arn,
+            aws_cloudwatch_metric_alarm.high_disk.arn,
+          ]
+        }
+      }
+    ]
+  })
+}
+
+# ----------------------------
+# LOG GROUP
+# ----------------------------
+resource "aws_cloudwatch_log_group" "ec2_logs" {
+  name              = "/ec2/system-logs"
+  retention_in_days = 7
+  tags              = { Name = "ec2-system-logs" }
 }
 
 # ----------------------------
 # OUTPUTS
 # ----------------------------
-output "alb_dns_name" {
-  description = "Access your web app at this URL"
-  value       = "http://${aws_lb.web_alb.dns_name}"
+output "instance_id" {
+  value = aws_instance.monitored_ec2.id
+}
+
+output "sns_topic_arn" {
+  value = aws_sns_topic.alerts.arn
+}
+
+output "dashboard_url" {
+  value = "https://${var.aws_region}.console.aws.amazon.com/cloudwatch/home?region=${var.aws_region}#dashboards:name=EC2-Monitoring-Dashboard"
+}
+
+output "important_note" {
+  value = "IMPORTANT: Check your email (${var.alert_email}) and confirm the SNS subscription to receive alerts!"
 }
